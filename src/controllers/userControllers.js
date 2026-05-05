@@ -1,154 +1,178 @@
 const pool = require('../config/db');
 
-const signup3 = async (req, res) => {
-    try {
-        const { name, email, password } = req.body;
-        if (!name || !email || !password) {
-            return res.status(400).json({
-                message: 'Name, email and password are required'
-            })
-        }
-
-        const existingUser = false;
-        if (existingUser) {
-            return res.status(400).json({
-                message: 'User already exists'
-            })
-        }
-
-        const result = await pool.query(`
-            INSERT INTO users (name, email, password)
-            VALUES ($1, $2, $3)
-            RETURNING id, name, email
-        `, [name, email, password]);
-
-        console.log("created user is :", result.rows[0]);
-
-        return res.status(201).json({
-            message: "User registered successfully!!",
-            userInfo: result.rows[0],
-            result: result
-        })
-    } catch (err) {
-        return res.status(500).json({
-            error: 'Internal Server Error',
-            message: err.message
-        });
-    }
-}
-
-const deleteUser = async (req, res) => {
-    try {
-        const userId = req.params.id;
-
-        const deletedUser = await pool.query(`
-            DELETE FROM users
-            WHERE id = $1
-            RETURNING id, name, email
-        `, [userId]);
-
-        if (deletedUser.rowCount === 0) {
-            return res.status(404).json({
-                message: 'User not found'
-            });
-        }
-
-        return res.status(200).json({
-            message: 'User deleted successfully'
-        });
-    } catch (err) {
-        return res.status(500).json({
-            error: 'Internal Server Error',
-            message: err.message
-        });
-    }
-}
-
-const getUserById = async (req, res) => {
-    try {
-        const userId = req.params.id;
-
-        const user = await pool.query(`
-            SELECT * FROM users
-            WHERE id = $1
-        `, [userId]);
-
-        if (user.rowCount === 0) {
-            return res.status(404).json({
-                message: 'User not found'
-            });
-        }
-
-        return res.status(200).json({
-            user: user.rows[0],
-            result: user
-        });
-    } catch (err) {
-        return res.status(500).json({
-            error: 'Internal Server Error',
-            message: err.message
-        });
-    }
-}
-
-const getAllUsers = async (req, res) => {
-    try{
-        const result = await pool.query(`
-            SELECT * FROM users;
-        `)
-
-        return res.status(200).json({
-            message: "all user fetched successfully",
-            users: result.rows
-        });
-    } catch(err) {
-        console.log("Error in fetching all users :", err);
-        return res.status(500).json({
-            message: "Internal server Error",
-            error: err.message
-        })
-    }
-}
-
 const signup = async (req, res) => {
     try{
-        const {name, email, password } = req.body;
-
-        if(!name || !email || !password) {
+        const {name, email, password} = req.body;
+        
+        if(!name || !email || !password){
             return res.status(400).json({
-                message: "Name, email and password are required"
+                message: "All field required"
             })
         }
 
         const existingUser = await pool.query(`
             SELECT * FROM users
             WHERE email = $1
-        `, [email]);
+        `,[email]);
 
-        if(existingUser.rowCount > 0) {
+        if(existingUser.rowCount > 0){
             return res.status(400).json({
-                message: "User alredy exist",
+                message: "User already exits",
                 user: existingUser.rows[0]
             })
         }
 
         const result = await pool.query(`
             INSERT INTO users(name, email, password)
-            VALUES ($1, $2, $3)
-        `, [name, email, password])
+            VALUES($1, $2, $3)
+            RETURNING *
+        `, [name, email, password]);
 
         return res.status(201).json({
-            message: "User created successfully",
-            user: result.rows[0],
-            result: result
+            message: "user signedup successfully",
+            user: result.rows[0]
         })
     } catch (err) {
-        console.log("Error in signup ->", err);
+        console.log("error in user signup :", err);
         return res.status(500).json({
-            error: 'Internal Server Error',
-            message: err.message
-        });
+            message: "Internal Server Error",
+            error: err.message
+        })
     }
 }
 
-module.exports = { signup, deleteUser, getUserById, getAllUsers };
+const login = async (req, res) => {
+    try{
+        const {email, password} = req.body;
+        if(!email || !password){
+            return res.status(400).json({
+                message: "All fields required"
+            })
+        }
+
+        const existingUser = await pool.query(`
+            SELECT * FROM users
+            WHERE email = $1 AND password = $2
+        `,[email, password]);
+
+        if(existingUser.rowCount > 0){
+            return res.status(200).json({
+                message: "User login successfully........",
+                user: existingUser.rows[0]
+            })
+        } else {
+            return res.status(400).json({
+                message: "Invalid email or password......",
+            })
+        }
+
+        // below code will not run
+
+        const isPasswordMatch = existingUser.rows[0].password === password ? true : false;
+
+        if(isPasswordMatch){
+            return res.status(200).json({
+                message: "User login successfully", 
+                user: existingUser.rows[0]
+            })
+        } else {
+            return res.status(400).json({
+                message: "Invalid password",
+            })
+        }
+    } catch(err){
+        console.log("error in user login :", err);
+        return res.status(500).json({
+            message: "Internal Server Error",
+            error: err.message
+        })
+    }
+}
+
+const getUserById = async (req, res) => {
+    try{
+        const { id } = req.params;
+        if(!id){
+            return res.status(400).json({
+                message: "Id is required to delete the user"
+            });
+        }
+
+        const existingUser = await pool.query(`
+            SELECT * FROM users
+            WHERE id = $1
+        `,[id]);
+
+        if(existingUser.rowCount > 0){
+            return res.status(200).json({
+                message: "User found",
+                user: existingUser.rows[0]
+            })
+        } else {
+            return res.status(400).json({
+                message: "User not found"
+            })
+        }
+    } catch (err) {
+        console.log("error in fetcing user by id :", err);
+        return res.status(500).json({
+            message: "Internal server error"
+        })
+    }
+}
+
+const deleteUser = async (req, res) => {
+    try {
+        const {id} = req.params;
+        if(!id){
+            return res.status(400).json({
+                message: "Id is required to delete User"
+            })
+        }
+
+        const checkAndDelete = await pool.query(`
+            DELETE FROM users
+            WHERE id = $1
+            RETURNING *
+        `,[id]);
+
+        if(checkAndDelete.rows.length > 0){
+            return res.status(200).json({
+                message: "User deleted successfully",
+                user: checkAndDelete.rows[0]
+            })
+        } else {
+            return res.status(400).json({
+                message: "User not found"
+            })
+        }
+
+    } catch (err) {
+        console.log("error in delete user ->", err);
+        return res.status(500).json({
+            message: "Internal Server Error",
+            error: err.message
+        })
+    }
+}
+
+const getAllUsers = async (req, res) => {
+    try {
+        const users = await pool.query(`
+            SELECT id, name, email FROM users;
+        `)
+
+        return res.status(200).json({
+            message: "User list",
+            users: users.rows
+        });
+    } catch (err) {
+        console.log("error is :", err);
+        return res.status(500).json({
+            message: "Internal server error",
+            error: err.message
+        })
+    }
+}
+
+module.exports = { signup, login, deleteUser, getUserById, getAllUsers };
